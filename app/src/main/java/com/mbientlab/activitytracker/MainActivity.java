@@ -175,24 +175,30 @@ public class MainActivity extends ActionBarActivity implements ScannerCallback, 
        activitySampleDb.close();
     }
 
-    private void connectDevice(BluetoothDevice device){
-        mwController = mwService.getMetaWearController(device);
-        mwController.addDeviceCallback(new MetaWearController.DeviceCallbacks() {
-            @Override
-            public void connected() {
-                Log.i("Metawear Controller", "Device Connected");
-                Toast.makeText(getApplicationContext(), R.string.toast_connected, Toast.LENGTH_SHORT).show();
-                if(accelerometerFragment != null) {
-                    accelerometerFragment.restoreState(sharedPreferences);
-                }
+    private MetaWearController.DeviceCallbacks dCallback= new MetaWearController.DeviceCallbacks() {
+        @Override
+        public void connected() {
+            Log.i("Metawear Controller", "Device Connected");
+            Toast.makeText(getApplicationContext(), R.string.toast_connected, Toast.LENGTH_SHORT).show();
+
+            if(accelerometerFragment != null) {
+                accelerometerFragment.restoreState(sharedPreferences);
             }
 
-            @Override
-            public void disconnected() {
-                Log.i("Metawear Controler", "Device Disconnected");
-                Toast.makeText(getApplicationContext(), R.string.toast_disconnected, Toast.LENGTH_SHORT).show();
-            }
-        });
+            MWDeviceConfirmFragment mwDeviceConfirmFragment = new MWDeviceConfirmFragment();
+            mwDeviceConfirmFragment.flashDeviceLight(mwController, getFragmentManager());
+        }
+
+        @Override
+        public void disconnected() {
+            Log.i("Metawear Controler", "Device Disconnected");
+            Toast.makeText(getApplicationContext(), R.string.toast_disconnected, Toast.LENGTH_SHORT).show();
+        }
+    };
+
+    private void connectDevice(BluetoothDevice device){
+        mwController = mwService.getMetaWearController(device);
+        mwController.addDeviceCallback(dCallback);
 
         mwController.connect();
 
@@ -222,8 +228,6 @@ public class MainActivity extends ActionBarActivity implements ScannerCallback, 
     public void btDeviceSelected(BluetoothDevice device) {
         bluetoothDevice = device;
         connectDevice(device);
-        MWDeviceConfirmFragment mwDeviceConfirmFragment = new MWDeviceConfirmFragment();
-        mwDeviceConfirmFragment.flashDeviceLight(mwController, getFragmentManager());
     }
 
     public void pairDevice(){
