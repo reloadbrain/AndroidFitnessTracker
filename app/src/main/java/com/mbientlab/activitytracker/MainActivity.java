@@ -105,6 +105,7 @@ public class MainActivity extends ActionBarActivity implements ScannerCallback, 
     private BluetoothAdapter btAdapter;
     private Menu menu;
     private SQLiteDatabase activitySampleDb;
+    private boolean btDeviceSelected = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -185,8 +186,11 @@ public class MainActivity extends ActionBarActivity implements ScannerCallback, 
                 accelerometerFragment.restoreState(sharedPreferences);
             }
 
-            MWDeviceConfirmFragment mwDeviceConfirmFragment = new MWDeviceConfirmFragment();
-            mwDeviceConfirmFragment.flashDeviceLight(mwController, getFragmentManager());
+            if(btDeviceSelected) {
+                MWDeviceConfirmFragment mwDeviceConfirmFragment = new MWDeviceConfirmFragment();
+                mwDeviceConfirmFragment.flashDeviceLight(mwController, getFragmentManager());
+                btDeviceSelected = false;
+            }
         }
 
         @Override
@@ -227,6 +231,7 @@ public class MainActivity extends ActionBarActivity implements ScannerCallback, 
     @Override
     public void btDeviceSelected(BluetoothDevice device) {
         bluetoothDevice = device;
+        btDeviceSelected = true;
         connectDevice(device);
     }
 
