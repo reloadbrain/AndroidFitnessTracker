@@ -1,6 +1,7 @@
 package com.mbientlab.activitytracker;
 
 import android.app.AlertDialog;
+import android.app.FragmentTransaction;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
@@ -31,10 +32,10 @@ import android.widget.Toast;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.listener.OnChartValueSelectedListener;
 import com.github.mikephil.charting.utils.Highlight;
-import com.mbientlab.activitytracker.MWScannerFragment.ScannerCallback;
 import com.mbientlab.activitytracker.MWDeviceConfirmFragment.DeviceConfirmCallback;
 import com.mbientlab.activitytracker.db.ActivitySampleDbHelper;
 import com.mbientlab.activitytracker.model.ActivitySampleContract;
+import com.mbientlab.bletoolbox.scanner.BleScannerFragment;
 import com.mbientlab.metawear.api.MetaWearBleService;
 import com.mbientlab.metawear.api.MetaWearController;
 import com.mbientlab.metawear.api.Module;
@@ -47,6 +48,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 import java.util.TimeZone;
+import java.util.UUID;
 
 /**
  * Copyright 2014 MbientLab Inc. All rights reserved.
@@ -85,7 +87,8 @@ import java.util.TimeZone;
  * Twitter: @lgleasain
  */
 
-public class MainActivity extends ActionBarActivity implements ScannerCallback, ServiceConnection, DeviceConfirmCallback, GraphCallback, AccelerometerFragment.AccelerometerCallback
+public class MainActivity extends ActionBarActivity implements BleScannerFragment.ScannerCommunicationBus,
+        ServiceConnection, DeviceConfirmCallback, GraphCallback, AccelerometerFragment.AccelerometerCallback
 {
 
     /**
@@ -226,13 +229,6 @@ public class MainActivity extends ActionBarActivity implements ScannerCallback, 
                 connectMenuItem.setTitle(R.string.disconnect);
             }
             return true;
-    }
-
-    @Override
-    public void btDeviceSelected(BluetoothDevice device) {
-        bluetoothDevice = device;
-        btDeviceSelected = true;
-        connectDevice(device);
     }
 
     public void pairDevice(){
@@ -458,6 +454,34 @@ public class MainActivity extends ActionBarActivity implements ScannerCallback, 
             return graphFragment;
         }
 
+    }
+
+
+    /**
+     * callbacks for Bluetooth device scan
+     */
+    @Override
+    public void onDeviceSelected(BluetoothDevice device) {
+        bluetoothDevice = device;
+        btDeviceSelected = true;
+        connectDevice(device);
+        Fragment metawearBlescannerPopup = getFragmentManager().findFragmentById(R.id.metawear_blescanner_popup_fragment);
+        FragmentTransaction fragmentTransaction = getFragmentManager().beginTransaction();
+        fragmentTransaction.remove(metawearBlescannerPopup);
+        fragmentTransaction.commit();
+        mwScannerFragment.dismiss();
+    }
+
+    @Override
+    public UUID[] getFilterServiceUuids() {
+        ///< Only return MetaWear boards in the scan
+        return new UUID[]{UUID.fromString("326a9000-85cb-9195-d9dd-464cfbbae75a")};
+    }
+
+    @Override
+    public long getScanDuration() {
+        ///< Scan for 10000ms (10 seconds)
+        return 10000;
     }
 
 }

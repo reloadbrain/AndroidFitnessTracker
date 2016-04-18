@@ -1,27 +1,32 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!--
+<?xml version="1.0" encoding="utf-8"?><!--
     Copyright 2014 MbientLab Inc. All rights reserved.
     Author : Eric Tsai
  -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    style="?android:attr/buttonBarStyle"
     android:id="@+id/mw_device_selection_layout"
+    style="?android:attr/buttonBarStyle"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical" >
+    android:orientation="vertical">
+
+    <fragment xmlns:tools="http://schemas.android.com/tools"
+        android:id="@+id/metawear_blescanner_popup_fragment"
+        android:name="com.mbientlab.bletoolbox.scanner.BleScannerFragment"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        tools:layout="@layout/blescan_device_list" />
+
 
     <ListView
         android:id="@+id/scanned_devices"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1" >
-    </ListView>
+        android:layout_weight="1"></ListView>
 
     <Button
         android:id="@+id/scan_control"
         style="?android:attr/buttonBarButtonStyle"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-         />
+        android:layout_height="wrap_content" />
 
 </LinearLayout>
