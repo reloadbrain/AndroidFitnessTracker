@@ -76,7 +76,8 @@ public class AccelerometerFragment extends Fragment {
     private SQLiteDatabase activitySampleDb;
     private AccelerometerCallback accelerometerCallback;
     private final byte ACTIVITY_DATA_SIZE = 4;
-    private final int TIME_DELAY_PERIOD = 60000;
+    //private final int TIME_DELAY_PERIOD = 60000;
+    private final int TIME_DELAY_PERIOD = 5000;
 
     private byte rmsFilterId = -1, accumFilterId = -1, timeFilterId = -1, timeTriggerId = -1;
 
@@ -352,6 +353,11 @@ public class AccelerometerFragment extends Fragment {
             result.setLogMessageHandler("mystream", loggingMessageHandler);
             editor.putInt(mwBoard.getMacAddress() + "_log_id", result.id());
             editor.apply();
+            Mma8452qAccelerometer mma8452qAccelerometer = (Mma8452qAccelerometer) accelModule;
+            mma8452qAccelerometer.configureAxisSampling().setFullScaleRange(Mma8452qAccelerometer.FullScaleRange.FSR_8G)
+                .enableHighPassFilter((byte) 0).commit();
+            accelModule.enableAxisSampling();
+            accelModule.start();
         }
     };
 
@@ -367,15 +373,17 @@ public class AccelerometerFragment extends Fragment {
 
         accelModule.setOutputDataRate(100.f);
         Mma8452qAccelerometer mma8452qAccelerometer = (Mma8452qAccelerometer) accelModule;
-        mma8452qAccelerometer.configureAxisSampling().setFullScaleRange(Mma8452qAccelerometer.FullScaleRange.FSR_8G)
-                .enableHighPassFilter((byte) 0).commit();
+        //mma8452qAccelerometer.configureAxisSampling().setFullScaleRange(Mma8452qAccelerometer.FullScaleRange.FSR_8G)
+        //        .enableHighPassFilter((byte) 0);//.commit();
         mma8452qAccelerometer.routeData().fromAxes().process(new Rms())
                 .process(new Accumulator((byte) 4))
                 .process(new Time(Time.OutputMode.ABSOLUTE, TIME_DELAY_PERIOD))
                 .log("log_stream")
                 .commit().onComplete(acceleromterHandler);
 
-        accelModule.start();
+        //mma8452qAccelerometer.configureAxisSampling().setFullScaleRange(Mma8452qAccelerometer.FullScaleRange.FSR_8G)
+        //        .enableHighPassFilter((byte) 0).commit();
+        //accelModule.start();
 
         try {
             loggingModule = mwBoard.getModule(Logging.class);
@@ -419,9 +427,18 @@ public class AccelerometerFragment extends Fragment {
                 accelerometerCallback.totalDownloadEntries(totalEntries);
                 accelerometerCallback.downloadProgress(totalEntries - nEntriesLeft);
                 if (nEntriesLeft == 0) {
-                    GraphFragment graphFragment = accelerometerCallback.getGraphFragment();
-                    graphFragment.updateGraph();
-                    accelerometerCallback.downloadFinished();
+                    getActivity()
+                            .runOnUiThread(new Runnable() {
+                                               @Override
+                                               public void run() {
+                                                   GraphFragment graphFragment = accelerometerCallback.getGraphFragment();
+                                                   graphFragment.updateGraph();
+                                                   accelerometerCallback.downloadFinished();
+                                               }
+                                           }
+
+                            );
+
                 }
             }
         });
