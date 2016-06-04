@@ -11,9 +11,10 @@ import android.view.View.OnClickListener;
 import android.view.ViewGroup;
 import android.widget.Button;
 
-import com.mbientlab.metawear.api.MetaWearController;
-import com.mbientlab.metawear.api.Module;
-import com.mbientlab.metawear.api.controller.LED;
+import com.mbientlab.metawear.MetaWearBoard;
+import com.mbientlab.metawear.UnsupportedModuleException;
+import com.mbientlab.metawear.module.Led;
+
 
 /**
  * Copyright 2014 MbientLab Inc. All rights reserved.
@@ -58,20 +59,26 @@ public class MWDeviceConfirmFragment extends DialogFragment {
     }
 
 
-    private LED ledCtrllr = null;
+    private Led ledModule = null;
     private Button yesButton = null;
     private Button noButton = null;
     private DeviceConfirmCallback callback = null;
     private String currentState = null;
 
 
-    public void flashDeviceLight(MetaWearController mwController, FragmentManager fragmentManager) {
-        ledCtrllr = (LED) mwController.getModuleController(Module.LED);
-        ledCtrllr.setColorChannel(LED.ColorChannel.BLUE).withHighIntensity((byte) 31)
-                .withRiseTime((short) 750).withFallTime((short) 750)
-                .withHighTime((short) 500).withPulseDuration((short) 2000)
-                .withRepeatCount((byte) -1).commit();
-        ledCtrllr.play(false);
+    public void flashDeviceLight(MetaWearBoard metaWearBoard, FragmentManager fragmentManager) {
+         try {
+            ledModule = metaWearBoard.getModule(Led.class);
+        }catch(UnsupportedModuleException e){
+            Log.e("Led Fragment", e.toString());
+        }
+        ledModule.configureColorChannel(Led.ColorChannel.BLUE)
+                .setRiseTime((short)750).setPulseDuration((short) 2000)
+                .setRepeatCount((byte)-1).setHighTime((short) 500)
+                .setFallTime((short) 750).setLowIntensity((byte)0)
+                .setHighIntensity((byte) 31).commit();
+
+        ledModule.play(true);
 
         show(fragmentManager, "device_confirm_callback");
     }
@@ -97,7 +104,7 @@ public class MWDeviceConfirmFragment extends DialogFragment {
         noButton.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
-                ledCtrllr.stop(false);
+                ledModule.stop(false);
                 callback.dontPairDevice();
                 dismiss();
             }
@@ -107,7 +114,7 @@ public class MWDeviceConfirmFragment extends DialogFragment {
         yesButton.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
-                ledCtrllr.stop(false);
+                ledModule.stop(false);
                 callback.pairDevice();
                 dismiss();
             }

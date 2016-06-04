@@ -46,7 +46,8 @@ public class ActivitySampleDbHelper extends DbHelper{
             "CREATE TABLE " + ActivitySampleContract.ActivitySampleEntry.TABLE_NAME + " (" +
                     ActivitySampleContract.ActivitySampleEntry._ID + " INTEGER PRIMARY KEY," +
                     ActivitySampleContract.ActivitySampleEntry.COLUMN_NAME_SAMPLE_TIME + TEXT_TYPE + COMMA_SEP +
-                    ActivitySampleContract.ActivitySampleEntry.COLUMN_NAME_MILLIG + INT_TYPE +
+                    ActivitySampleContract.ActivitySampleEntry.COLUMN_NAME_MILLIG + INT_TYPE + COMMA_SEP +
+                    ActivitySampleContract.ActivitySampleEntry.COLUMN_NAME_STEPS + INT_TYPE +
                     " )"};
 
 
@@ -55,7 +56,7 @@ public class ActivitySampleDbHelper extends DbHelper{
     };
 
     // If you change the database schema, you must increment the database version.
-    public static final int DATABASE_VERSION = 1;
+    public static final int DATABASE_VERSION = 3;
     public static final String DATABASE_NAME = "MetaTracker.db";
 
     public ActivitySampleDbHelper(Context context) {
