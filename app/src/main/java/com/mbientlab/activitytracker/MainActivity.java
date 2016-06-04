@@ -150,7 +150,6 @@ public class MainActivity extends ActionBarActivity implements BleScannerFragmen
         getApplicationContext().bindService(new Intent(this, MetaWearBleService.class),
                 this, Context.BIND_AUTO_CREATE);
 
-
     }
 
     @Override
@@ -191,10 +190,6 @@ public class MainActivity extends ActionBarActivity implements BleScannerFragmen
                           }
             );
 
-        /*    if (accelerometerFragment != null) {
-                accelerometerFragment.restoreState(sharedPreferences);
-            }*/
-
             if (btDeviceSelected) {
                 MWDeviceConfirmFragment mwDeviceConfirmFragment = new MWDeviceConfirmFragment();
                 mwDeviceConfirmFragment.flashDeviceLight(metaWearBoard, getFragmentManager());
@@ -217,13 +212,22 @@ public class MainActivity extends ActionBarActivity implements BleScannerFragmen
     private void connectDevice(BluetoothDevice device) {
         metaWearBoard = metaWearBinder.getMetaWearBoard(device);
         metaWearBoard.setConnectionStateHandler(connectionStateHandler);
-
         metaWearBoard.connect();
-
 
         if (menu != null) {
             MenuItem connectMenuItem = menu.findItem(R.id.action_connect);
             connectMenuItem.setTitle(R.string.disconnect);
+        }
+
+        String bleMacAddress = sharedPreferences.getString("ble_mac_address", null);
+
+        if (bleMacAddress != null) {
+            // probably need to move this
+            String boardState = sharedPreferences.getString(bleMacAddress, null);
+            if (boardState != null) {
+                metaWearBoard.deserializeState(boardState.getBytes());
+                Log.i("connect device", "Found instance state");
+            }
         }
     }
 
@@ -261,15 +265,29 @@ public class MainActivity extends ActionBarActivity implements BleScannerFragmen
     }
 
     @Override
+    protected void onSaveInstanceState(Bundle state) {
+        super.onSaveInstanceState(state);
+        if (metaWearBoard != null) {
+            metaWearBoard.disconnect();
+            editor.putString("ble_mac_address", metaWearBoard.getMacAddress());
+            state.putByteArray(metaWearBoard.getMacAddress(), metaWearBoard.serializeState());
+            editor.putString(metaWearBoard.getMacAddress(), new String(metaWearBoard.serializeState()));
+            editor.apply();
+            editor.commit();
+        }
+    }
+
+    @Override
     public void onServiceConnected(ComponentName name, IBinder service) {
         ///< Get a reference to the MetaWear service from the binder
         metaWearBinder = (MetaWearBleService.LocalBinder) service;
         String bleMacAddress = sharedPreferences.getString("ble_mac_address", null);
-        Log.i("Service Connected", "Stored mac address is " + bleMacAddress);
+
         if (bleMacAddress != null) {
             bluetoothDevice = btAdapter.getRemoteDevice(bleMacAddress);
             connectDevice(bluetoothDevice);
         }
+        Log.i("Service Connected", "Stored mac address is " + bleMacAddress);
     }
 
     @Override
@@ -348,7 +366,11 @@ public class MainActivity extends ActionBarActivity implements BleScannerFragmen
                 break;
             case R.id.action_reset_device:
                 try {
-                    metaWearBoard.getModule(Debug.class).resetDevice();
+                    if (metaWearBoard != null && metaWearBoard.getModule(Debug.class) != null)
+                        metaWearBoard.getModule(Debug.class).resetDevice();
+                    else
+                        Toast.makeText(getApplicationContext(), R.string.toast_please_connect, Toast.LENGTH_SHORT).show();
+
                 } catch (UnsupportedModuleException e) {
                     Toast.makeText(this, R.string.error_soft_reset, Toast.LENGTH_SHORT).show();
                 }
@@ -362,14 +384,24 @@ public class MainActivity extends ActionBarActivity implements BleScannerFragmen
                 activitySampleDb.execSQL("delete from " + ActivitySampleContract.ActivitySampleEntry.TABLE_NAME);
                 break;
             case R.id.action_refresh:
-                if (!metaWearBoard.isConnected()) {
-                    metaWearBoard.connect();
+                if ((metaWearBoard != null) && !metaWearBoard.isConnected()) {
+                    String bleMacAddress = sharedPreferences.getString("ble_mac_address", null);
+                    if (bleMacAddress != null) {
+                        bluetoothDevice = btAdapter.getRemoteDevice(bleMacAddress);
+                        connectDevice(bluetoothDevice);
+                        metaWearBoard.connect();
+                    } else {
+                        Toast.makeText(getApplicationContext(), R.string.toast_please_connect, Toast.LENGTH_SHORT).show();
+                    }
+                } else if(metaWearBoard == null){
+                    Toast.makeText(getApplicationContext(), R.string.toast_please_connect, Toast.LENGTH_SHORT).show();
+                } else
+                {
+                    if (accelerometerFragment == null) {
+                        //accelerometerFragment.restoreState(sharedPreferences);
+                    }
+                    accelerometerFragment.startLogDownload(metaWearBoard, sharedPreferences, activitySampleDb);
                 }
-                if (accelerometerFragment == null) {
-
-                    //accelerometerFragment.restoreState(sharedPreferences);
-                }
-                accelerometerFragment.startLogDownload(metaWearBoard, sharedPreferences, activitySampleDb);
                 break;
         }
 

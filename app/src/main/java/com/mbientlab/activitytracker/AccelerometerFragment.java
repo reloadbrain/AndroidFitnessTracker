@@ -5,6 +5,7 @@ import android.content.ContentValues;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.Editor;
 import android.database.sqlite.SQLiteDatabase;
+import android.support.v7.widget.LinearLayoutCompat;
 import android.util.Base64;
 import android.util.Log;
 
@@ -15,9 +16,11 @@ import com.mbientlab.metawear.MetaWearBoard;
 import com.mbientlab.metawear.RouteManager;
 import com.mbientlab.metawear.UnsupportedModuleException;
 import com.mbientlab.metawear.module.Accelerometer;
+import com.mbientlab.metawear.module.Bmi160Accelerometer;
 import com.mbientlab.metawear.module.DataProcessor;
 import com.mbientlab.metawear.module.Logging;
 import com.mbientlab.metawear.module.Mma8452qAccelerometer;
+import com.mbientlab.metawear.module.Timer;
 import com.mbientlab.metawear.processor.Accumulator;
 import com.mbientlab.metawear.processor.Rms;
 import com.mbientlab.metawear.processor.Time;
@@ -69,17 +72,11 @@ import java.util.TimeZone;
 public class AccelerometerFragment extends Fragment {
     private Accelerometer accelModule;
     private Logging loggingModule;
-    private DataProcessor dataProcessorController;
     private Editor editor;
     private MetaWearBoard mwBoard;
-    private int totalEntryCount;
     private SQLiteDatabase activitySampleDb;
     private AccelerometerCallback accelerometerCallback;
-    private final byte ACTIVITY_DATA_SIZE = 4;
-    //private final int TIME_DELAY_PERIOD = 60000;
-    private final int TIME_DELAY_PERIOD = 5000;
-
-    private byte rmsFilterId = -1, accumFilterId = -1, timeFilterId = -1, timeTriggerId = -1;
+    private final int TIME_DELAY_PERIOD = 10000;
 
     public interface AccelerometerCallback {
         public void startDownload();
@@ -99,238 +96,14 @@ public class AccelerometerFragment extends Fragment {
         accelerometerCallback = (AccelerometerCallback) getActivity();
     }
 
-    /*    private final DataProcessor.Callbacks dpCallbacks = new DataProcessor.Callbacks() {
-            @Override
-            public void receivedFilterId(byte filterId) {
-                byte filterArray[] = {filterId};
-                if (rmsFilterId == -1) {
-                    rmsFilterId = filterId;
-                    editor.putString("rmsFilterId", Base64.encodeToString(filterArray, Base64.NO_WRAP));
-                    editor.commit();
-                    FilterConfig accumFilter = new FilterConfigBuilder.AccumulatorBuilder()
-                            .withInputSize(LoggingTrigger.ACCELEROMETER_X_AXIS.length())
-                            .withOutputSize(ACTIVITY_DATA_SIZE)
-                            .build();
-
-                    dataProcessorController.chainFilters(rmsFilterId, ACTIVITY_DATA_SIZE, accumFilter);
-                } else if (accumFilterId == -1) {
-                    accumFilterId = filterId;
-                    editor.putString("accumFilterId", Base64.encodeToString(filterArray, Base64.NO_WRAP));
-                    editor.commit();
-                    FilterConfig timeFilter = new FilterConfigBuilder.TimeDelayBuilder()
-                            .withFilterMode(FilterConfigBuilder.TimeDelayBuilder.FilterMode.ABSOLUTE)
-                            .withPeriod(TIME_DELAY_PERIOD)
-                            .withDataSize(ACTIVITY_DATA_SIZE)
-                            .build();
-                    dataProcessorController.chainFilters(accumFilterId, ACTIVITY_DATA_SIZE, timeFilter);
-                } else {
-                    if (timeFilterId == -1) {
-                        timeFilterId = filterId;
-                        editor.putString("timeFilterId", Base64.encodeToString(filterArray, Base64.NO_WRAP));
-                        editor.commit();
-                        loggingModule.addTrigger(TriggerBuilder.buildDataFilterTrigger(timeFilterId, ACTIVITY_DATA_SIZE));
-                    }
-                    mwBoard.removeModuleCallback(this);
-                }
-
-            }
-
-        };
-    */
     private String getDateTime(Date date) {
         SimpleDateFormat dateFormat = new SimpleDateFormat(
                 "yyyy-MM-dd HH:mm:ss", Locale.getDefault());
         dateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
         return dateFormat.format(date);
     }
-/*
-    private final Logging.Callbacks logCallbacks = new Logging.Callbacks() {
-        private final float notifyRatio = 0.01f;
-        private boolean isDownloading;
-        private ReferenceTick refTick;
-        private LogEntry firstEntry = null;
 
-        @Override
-        public void receivedLogEntry(final LogEntry entry) {
-            if (firstEntry == null) {
-                firstEntry = entry;
-            }
-
-            int activityMilliG = ByteBuffer.wrap(entry.data())
-                    .order(ByteOrder.LITTLE_ENDIAN).getInt();
-
-
-            byte tId = entry.triggerId();
-            Date entryTime = entry.timestamp(refTick).getTime();
-
-            if (tId == timeTriggerId) {
-                Log.i("LoggingExample", "Time Trigger Id " + entryTime.toString() + String.valueOf(activityMilliG));//String.format(outputFormat, "Z-Axis", entryTime, Gs));
-                Log.i("ActivityTracker", String.format(Locale.US, "%.3f,%.3f",
-                        entry.offset(firstEntry) / 1000.0, activityMilliG / 1000.0));
-                ContentValues contentValues = new ContentValues();
-                contentValues.put(ActivitySampleContract.ActivitySampleEntry.COLUMN_NAME_MILLIG, activityMilliG);
-                contentValues.put(ActivitySampleContract.ActivitySampleEntry.COLUMN_NAME_SAMPLE_TIME, getDateTime(entryTime));
-                activitySampleDb.insert(ActivitySampleContract.ActivitySampleEntry.TABLE_NAME, null, contentValues);
-            } else {
-                Log.i("LoggingExample", String.format("Unkown Trigger ID, (%d, %s)",
-                        tId, Arrays.toString(entry.data())));
-            }
-        }
-
-
-        @Override
-        public void receivedReferenceTick(ReferenceTick reference) {
-            refTick = reference;
-
-            Log.i("LoggingExample", String.format("Received the reference tick = %s, %d", reference, reference.tickCount()));
-            // Got the reference tick, make lets get
-            // the log entry count
-            loggingModule.readTotalEntryCount();
-        }
-
-        @Override
-        public void receivedTriggerId(byte triggerId) {
-            byte triggerArray[] = {triggerId};
-            timeTriggerId = triggerId;
-            editor.putString("timeTriggerId", Base64.encodeToString(triggerArray, Base64.NO_WRAP));
-            editor.commit();
-            startLog();
-            Log.i("receivedTrigger", "Received trigger id " + String.valueOf(triggerId));
-            Log.i("encoded trigger", Base64.encodeToString(triggerArray, Base64.NO_WRAP));
-            Log.i("decoded trigger", String.valueOf(Base64.decode(Base64.encodeToString(triggerArray, Base64.NO_WRAP), Base64.NO_WRAP)[0]));
-        }
-
-        @Override
-        public void receivedTotalEntryCount(int totalEntries) {
-            if (!isDownloading && (totalEntries > 0)) {
-                totalEntryCount = totalEntries;
-                isDownloading = true;
-                Log.i("LoggingExample", "Download begin");
-
-                //Got the entry count, lets now download the log
-                loggingModule.downloadLog(totalEntries, (int) (totalEntries * notifyRatio));
-                accelerometerCallback.totalDownloadEntries(totalEntries);
-            } else {
-                accelerometerCallback.downloadFinished();
-                Log.i("LoggingExample", "Total Entries count " + String.valueOf(totalEntries));
-            }
-        }
-
-        @Override
-        public void receivedDownloadProgress(int nEntriesLeft) {
-            Log.i("LoggingExample", String.format("Entries remaining= %d", nEntriesLeft));
-            accelerometerCallback.downloadProgress(totalEntryCount - nEntriesLeft);
-        }
-
-        @Override
-        public void downloadCompleted() {
-            isDownloading = false;
-            Log.i("removing ", String.valueOf((short) totalEntryCount) + " entries");
-            loggingModule.removeLogEntries((short) totalEntryCount);
-            Log.i("LoggingExample", "Download completed");
-            mwBoard.waitToClose(false);
-            GraphFragment graphFragment = accelerometerCallback.getGraphFragment();
-            graphFragment.updateGraph();
-            accelerometerCallback.downloadFinished();
-        }
-    };
-
-    public void restoreState(SharedPreferences sharedPreferences) {
-        String rmsFilterString = sharedPreferences.getString("rmsFilterId", null);
-        String accumFilterString = sharedPreferences.getString("accumFilterId", null);
-        String timeFilterString = sharedPreferences.getString("timeFilterId", null);
-        String timeTriggerString = sharedPreferences.getString("timeTriggerId", null);
-        Log.i("Accelerometer", "Time Trigger Id is " + timeTriggerString);
-
-        if ((rmsFilterString != null) && (timeFilterString != null) && (timeTriggerString != null)) {
-            rmsFilterId = Base64.decode(rmsFilterString, Base64.NO_WRAP)[0];
-            accumFilterId = Base64.decode(accumFilterString, Base64.NO_WRAP)[0];
-            timeFilterId = Base64.decode(timeFilterString, Base64.NO_WRAP)[0];
-            timeTriggerId = Base64.decode(timeTriggerString, Base64.NO_WRAP)[0];
-        }
-        Log.i("Accelerometer", "Time Trigger Id is " + String.valueOf(timeTriggerId));
-    }
-
-    public void removeTriggers(Editor editor) {
-        loggingModule.removeTrigger(timeTriggerId);
-        removePersistedTriggers(editor);
-    }
-
-    public void removePersistedTriggers(Editor editor) {
-        editor.remove("rmsFilterId");
-        editor.remove("accumFilterId");
-        editor.remove("timeFilterId");
-        editor.remove("timeTriggerId");
-        editor.commit();
-        // Reset the IDs to -1
-        rmsFilterId = -1;
-        accumFilterId = -1;
-        timeFilterId = -1;
-        timeTriggerId = -1;
-    }
-
-    public void addTriggers(MetaWearController mwController, Editor editor) {
-        /*
-         * The board will start logging once all triggers have been registered.  This is done
-         * by having the receivedTriggerId callback fn start the logger when the ID for the
-         * Z axis has been received
-         */
-/*        this.editor = editor;
-        this.mwBoard = mwController;
-        accelModule = (Accelerometer) mwController.getModuleController(Module.ACCELEROMETER);
-        Trigger accelerometerTrigger = TriggerBuilder.buildAccelerometerTrigger();
-
-        setupLogginController(mwController);
-
-        FilterConfig rms = new FilterConfigBuilder.RMSBuilder().withInputCount((byte) 3)
-                .withSignedInput().withOutputSize(LoggingTrigger.ACCELEROMETER_X_AXIS.length())
-                .withInputSize(LoggingTrigger.ACCELEROMETER_X_AXIS.length())
-                .build();
-
-        dataProcessorController.addFilter(accelerometerTrigger, rms);
-
-        final Accelerometer accelCtrllr = (Accelerometer) mwController.getModuleController(Module.ACCELEROMETER);
-        accelCtrllr.enableXYZSampling().withFullScaleRange(SamplingConfig.FullScaleRange.FSR_8G)
-                .withHighPassFilter((byte) 0).withOutputDataRate(SamplingConfig.OutputDataRate.ODR_100_HZ)
-                .withSilentMode();
-        accelCtrllr.startComponents();
-    }
-
-    private void startLog() {
-        loggingModule.startLogging();
-
-        SamplingConfig samplingConfig = accelModule.enableXYZSampling();
-        samplingConfig.withFullScaleRange(SamplingConfig.FullScaleRange.FSR_8G)
-                .withOutputDataRate(SamplingConfig.OutputDataRate.ODR_100_HZ)
-                .withSilentMode();
-
-        accelModule.startComponents();
-    }
-
-    public void stopLog(MetaWearController mwController) {
-        setupLogginController(mwController);
-        loggingModule.stopLogging();
-
-        if (accelModule == null) {
-            accelModule = (Accelerometer) mwController.getModuleController(Module.ACCELEROMETER);
-        }
-
-        accelModule.stopComponents();
-    }
-
-    private void setupLogginController(MetaWearController mwController) {
-        if (loggingModule == null) {
-            loggingModule = (Logging) mwController.getModuleController(Module.LOGGING);
-            mwController.addModuleCallback(logCallbacks);
-        }
-        if (dataProcessorController == null) {
-            dataProcessorController = (DataProcessor) mwController.getModuleController(Module.DATA_PROCESSOR);
-        }
-        mwController.addModuleCallback(dpCallbacks);
-    }
-*/
-
-    private final RouteManager.MessageHandler loggingMessageHandler = new RouteManager.MessageHandler() {
+    private final RouteManager.MessageHandler mma8452LoggingMessageHandler = new RouteManager.MessageHandler() {
         @Override
         public void process(Message msg) {
             java.sql.Date date = new java.sql.Date(msg.getTimestamp().getTimeInMillis());
@@ -347,10 +120,10 @@ public class AccelerometerFragment extends Fragment {
         }
     };
 
-    private final AsyncOperation.CompletionHandler<RouteManager> acceleromterHandler = new AsyncOperation.CompletionHandler<RouteManager>() {
+    private final AsyncOperation.CompletionHandler<RouteManager> mma8452AcceleromterHandler = new AsyncOperation.CompletionHandler<RouteManager>() {
         @Override
         public void success(RouteManager result) {
-            result.setLogMessageHandler("mystream", loggingMessageHandler);
+            result.setLogMessageHandler("mystream", mma8452LoggingMessageHandler);
             editor.putInt(mwBoard.getMacAddress() + "_log_id", result.id());
             editor.apply();
             Mma8452qAccelerometer mma8452qAccelerometer = (Mma8452qAccelerometer) accelModule;
@@ -358,6 +131,57 @@ public class AccelerometerFragment extends Fragment {
                 .enableHighPassFilter((byte) 0).commit();
             accelModule.enableAxisSampling();
             accelModule.start();
+        }
+    };
+
+    private final RouteManager.MessageHandler bmi160LoggingMessageHandler = new RouteManager.MessageHandler() {
+        @Override
+        public void process(Message msg) {
+            java.sql.Date date = new java.sql.Date(msg.getTimestamp().getTimeInMillis());
+
+            int steps = msg.getData(Integer.class).intValue();
+
+            Log.i("LoggingExample", "Time Trigger Id " + date.toString() + String.valueOf(steps));//String.format(outputFormat, "Z-Axis", entryTime, Gs));
+            ContentValues contentValues = new ContentValues();
+            contentValues.put(ActivitySampleContract.ActivitySampleEntry.COLUMN_NAME_STEPS, steps);
+            contentValues.put(ActivitySampleContract.ActivitySampleEntry.COLUMN_NAME_SAMPLE_TIME, getDateTime(date));
+            activitySampleDb.insert(ActivitySampleContract.ActivitySampleEntry.TABLE_NAME, null, contentValues);
+        }
+    };
+
+    private final AsyncOperation.CompletionHandler<RouteManager> bmi160AccelerometerHandler = new AsyncOperation.CompletionHandler<RouteManager>(){
+        @Override
+        public void success(RouteManager result){
+            result.setLogMessageHandler("mystream", bmi160LoggingMessageHandler);
+            editor.putInt(mwBoard.getMacAddress() + "_log_id", result.id());
+            editor.apply();
+            final Bmi160Accelerometer bmi160Accelerometer = (Bmi160Accelerometer) accelModule;
+
+            bmi160Accelerometer.resetStepCounter();
+            bmi160Accelerometer.configureStepDetection()
+                    .setSensitivity(Bmi160Accelerometer.StepSensitivity.NORMAL)
+                    .enableStepCounter()
+                    .commit();
+            bmi160Accelerometer.start();
+
+            try{
+                AsyncOperation<Timer.Controller> taskResult = mwBoard.getModule(Timer.class)
+                        .scheduleTask(new Timer.Task(){
+                            @Override
+                            public void commands(){
+                                bmi160Accelerometer.readStepCounter(false);
+                            }
+                        }, TIME_DELAY_PERIOD, false);
+                taskResult.onComplete(new AsyncOperation.CompletionHandler<Timer.Controller>(){
+                    @Override
+                    public void success(Timer.Controller result){
+                        result.start();
+                    }
+                });
+            } catch (UnsupportedModuleException e){
+                Log.e("Temperature Fragment", e.toString());
+            }
+
         }
     };
 
@@ -371,19 +195,19 @@ public class AccelerometerFragment extends Fragment {
             Log.e("Thermistor Fragment", e.toString());
         }
 
-        accelModule.setOutputDataRate(100.f);
-        Mma8452qAccelerometer mma8452qAccelerometer = (Mma8452qAccelerometer) accelModule;
-        //mma8452qAccelerometer.configureAxisSampling().setFullScaleRange(Mma8452qAccelerometer.FullScaleRange.FSR_8G)
-        //        .enableHighPassFilter((byte) 0);//.commit();
-        mma8452qAccelerometer.routeData().fromAxes().process(new Rms())
-                .process(new Accumulator((byte) 4))
-                .process(new Time(Time.OutputMode.ABSOLUTE, TIME_DELAY_PERIOD))
-                .log("log_stream")
-                .commit().onComplete(acceleromterHandler);
-
-        //mma8452qAccelerometer.configureAxisSampling().setFullScaleRange(Mma8452qAccelerometer.FullScaleRange.FSR_8G)
-        //        .enableHighPassFilter((byte) 0).commit();
-        //accelModule.start();
+        if(accelModule instanceof Mma8452qAccelerometer) {
+            accelModule.setOutputDataRate(100.f);
+            Mma8452qAccelerometer mma8452qAccelerometer = (Mma8452qAccelerometer) accelModule;
+            mma8452qAccelerometer.routeData().fromAxes().process(new Rms())
+                    .process(new Accumulator((byte) 4))
+                    .process(new Time(Time.OutputMode.ABSOLUTE, TIME_DELAY_PERIOD))
+                    .log("log_stream")
+                    .commit().onComplete(mma8452AcceleromterHandler);
+        }else{
+            Bmi160Accelerometer bmi160Accelerometer = (Bmi160Accelerometer) accelModule;
+            bmi160Accelerometer.routeData().fromStepCounter(false).log("log_stream").commit()
+                    .onComplete(bmi160AccelerometerHandler);
+        }
 
         try {
             loggingModule = mwBoard.getModule(Logging.class);
@@ -414,16 +238,18 @@ public class AccelerometerFragment extends Fragment {
             Log.e("Thermistor Fragment", e.toString());
         }
 
-
         RouteManager route = mwBoard.getRouteManager(sharedPreferences.getInt(mwBoard.getMacAddress() + "_log_id", 0));
-        route.setLogMessageHandler("log_stream", loggingMessageHandler);
+        if(accelModule instanceof Mma8452qAccelerometer) {
+            route.setLogMessageHandler("log_stream", mma8452LoggingMessageHandler);
+        }else{
+            route.setLogMessageHandler("log_stream", bmi160LoggingMessageHandler);
+        }
 
         loggingModule.downloadLog((float) 0.1, new Logging.DownloadHandler() {
             @Override
             public void onProgressUpdate(int nEntriesLeft, int totalEntries) {
                 Log.i("Thermistor", String.format("Progress= %d / %d", nEntriesLeft,
                         totalEntries));
-                //mwController.waitToClose(false);
                 accelerometerCallback.totalDownloadEntries(totalEntries);
                 accelerometerCallback.downloadProgress(totalEntries - nEntriesLeft);
                 if (nEntriesLeft == 0) {
@@ -451,18 +277,4 @@ public class AccelerometerFragment extends Fragment {
         });
     }
 
-/*    public void startLogDownload(MetaWearController mwController, SQLiteDatabase activitySampleDb) {
-        /*
-           Before actually calling the downloadLog method, we will first gather the required
-           data to compute the log timestamps and setup progress notifications.
-           This means we will call downloadLog in one of the logging callback functions, and
-           will start the callback chain here
-         */
-/*        this.activitySampleDb = activitySampleDb;
-        this.mwBoard = mwController;
-        setupLogginController(mwController);
-        Log.i("LoggingExample", String.format("Starting Log Download"));
-        loggingModule.readReferenceTick();
-        accelerometerCallback.startDownload();
-    }*/
 }

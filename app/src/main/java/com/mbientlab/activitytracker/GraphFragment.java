@@ -81,6 +81,7 @@ public class GraphFragment extends Fragment {
     private SQLiteDatabase activitySampleDb;
     private ActivitySample[] activitySamples = new ActivitySample[61];
     private GraphCallback callback;
+    private boolean bmi160 = false;
 
     public interface GraphCallback {
         public void updateCaloriesAndSteps(int totalCalories, int totalSteps);
@@ -185,6 +186,7 @@ public class GraphFragment extends Fragment {
                 for (int i = 0; i <= zeroDbStartIndex; i++) {
                     activitySamples[i].setDate("");
                     activitySamples[i].setTotalMilliG(0L);
+                    activitySamples[i].setRawSteps(0);
                 }
             }
 
@@ -192,8 +194,15 @@ public class GraphFragment extends Fragment {
                 activitySampleCursor.moveToNext();
                 String date = activitySampleCursor.getString(activitySampleCursor.getColumnIndex(ActivitySampleContract.ActivitySampleEntry.COLUMN_NAME_SAMPLE_TIME));
                 Long milliG = activitySampleCursor.getLong(activitySampleCursor.getColumnIndex(ActivitySampleContract.ActivitySampleEntry.COLUMN_NAME_MILLIG));
+                Integer steps = activitySampleCursor.getInt(activitySampleCursor.getColumnIndex(ActivitySampleContract.ActivitySampleEntry.COLUMN_NAME_STEPS));
                 activitySamples[i].setDate(date);
                 activitySamples[i].setTotalMilliG(milliG);
+                activitySamples[i].setRawSteps(steps);
+
+                if(steps > 0) {
+                    bmi160 = true;
+                }
+
                 Log.i("GraphFragment data time ", date);
                 Log.i("GraphFragment data value ", String.valueOf(milliG));
             }
@@ -210,7 +219,11 @@ public class GraphFragment extends Fragment {
         totalSteps = 0;
 
         for (int j = 1; j < 61; j++) {
-            activitySamples[j].setIndividualMilliG(activitySamples[j].getTotalMilliG() - activitySamples[j - 1].getTotalMilliG());
+            if(bmi160){
+                activitySamples[j].setSteps(activitySamples[j].getRawSteps() - activitySamples[j - 1].getRawSteps());
+            }else {
+                activitySamples[j].setIndividualMilliG(activitySamples[j].getTotalMilliG() - activitySamples[j - 1].getTotalMilliG());
+            }
             totalCalories += activitySamples[j].getCalories();
             totalSteps += activitySamples[j].getSteps();
             entries.add(new BarEntry(activitySamples[j].getSteps(), j));

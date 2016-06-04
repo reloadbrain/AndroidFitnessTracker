@@ -44,6 +44,7 @@ public class ActivitySample {
     private String date = "";
     private Long totalMilliG = 0L;
     private int steps = 0;
+    private int rawSteps = 0;
     private int calories = 0;
     private Long individualMilliG = 0L;
 
@@ -70,6 +71,15 @@ public class ActivitySample {
         }
     }
 
+    public void setSteps(int steps){
+        this.steps = steps;
+        if(steps >0){
+            calories = (int) (steps * CALORIES_PER_STEP);
+        }else{
+            calories = 0;
+        }
+    }
+
     public Long getIndividualMilliG() {
         return individualMilliG;
     }
@@ -84,5 +94,13 @@ public class ActivitySample {
 
     public int getCalories() {
         return calories;
+    }
+
+    public void setRawSteps(int steps) {
+        this.rawSteps = steps;
+    }
+
+    public int getRawSteps(){
+        return rawSteps;
     }
 }

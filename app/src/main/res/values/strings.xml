@@ -27,5 +27,6 @@
     <string name="pairing_text">Do you see a blinking blue LED on the MetaWear?</string>
     <string name="toast_connected">MetaWear Connected</string>
     <string name="toast_disconnected">MetaWear Disconnected</string>
+    <string name="toast_please_connect">Please Connect To a MetaWear First</string>
     <string name="error_soft_reset">Board Reset Failed</string>
 </resources>
