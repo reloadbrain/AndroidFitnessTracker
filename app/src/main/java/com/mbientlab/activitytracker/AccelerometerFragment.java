@@ -76,7 +76,7 @@ public class AccelerometerFragment extends Fragment {
     private MetaWearBoard mwBoard;
     private SQLiteDatabase activitySampleDb;
     private AccelerometerCallback accelerometerCallback;
-    private final int TIME_DELAY_PERIOD = 10000;
+    private final int TIME_DELAY_PERIOD = 60000;
 
     public interface AccelerometerCallback {
         public void startDownload();
